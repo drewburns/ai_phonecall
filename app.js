@@ -19,9 +19,12 @@ AWS.config.update({
 });
 
 const s3 = new AWS.S3();
-const client = redis.createClient();
+const redisClient = redis.createClient({
+  host: "localhost", // Default is '127.0.0.1'
+  port: 6379, // Default is 6379
+});
 
-client.on("error", (err) => {
+redisClient.on("error", (err) => {
   console.error("Redis client error:", err);
 });
 
@@ -35,7 +38,7 @@ const twilioClient = twilio(accountSid, authToken);
 
 app.post("/voice", async (req, res) => {
   const callSid = req.body.CallSid;
-  await client.del(callSid); // Clear previous context
+  await redisClient.del(callSid); // Clear previous context
   const response = new twilio.twiml.VoiceResponse();
   const file = await synthesizeSpeech(
     "Thanks for calling, how can I help you?"
@@ -90,7 +93,7 @@ app.post("/process_speech", async (req, res) => {
 
 async function getContext(callSid) {
   return new Promise((resolve, reject) => {
-    client.get(callSid, (err, data) => {
+    redisClient.get(callSid, (err, data) => {
       if (err) return reject(err);
       if (data) return resolve(JSON.parse(data));
       return resolve([]);
@@ -100,7 +103,7 @@ async function getContext(callSid) {
 
 async function saveContext(callSid, context) {
   return new Promise((resolve, reject) => {
-    client.set(callSid, JSON.stringify(context), (err) => {
+    redisClient.set(callSid, JSON.stringify(context), (err) => {
       if (err) return reject(err);
       resolve();
     });
